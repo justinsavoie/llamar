@@ -1,0 +1,7 @@
+useDynLib(llamar, .registration = TRUE)
+import(Rcpp)
+export(llama_build_test)
+export(llama_generate_greedy)
+export(llama_generate)
+export(chat_format)
+export(chat)

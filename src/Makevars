@@ -1,0 +1,85 @@
+## Build llama.cpp and ggml in-tree (CPU-only)
+## This avoids ABI mismatches from external prebuilt libraries.
+
+## Ensure the default make target builds the shared library
+all: $(SHLIB)
+
+## C++ standard required by llama.cpp
+CXX_STD = CXX17
+
+## Force C++ linker for the shared library (we compile C++ sources)
+SHLIB_LD = $(CXX)
+
+## Optimization flags (safe defaults across platforms)
+PKG_CFLAGS   += -O3 -DNDEBUG -pthread
+PKG_CXXFLAGS += -O3 -DNDEBUG -pthread
+
+## Avoid forcing x86-specific flags by default to preserve portability
+
+## Ensure local headers are found from subdirectories
+PKG_CPPFLAGS += -I. -I./ggml-cpu
+PKG_CPPFLAGS += -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\"
+## Enable K-quants and use generic CPU kernels to provide needed symbols
+PKG_CPPFLAGS += -DGGML_USE_K_QUANTS -DGGML_CPU_GENERIC
+PKG_CPPFLAGS += -DGGML_USE_CPU
+
+## Explicit object list to avoid basename collisions (exclude ggml.cpp).
+OBJECTS = \
+    binary-ops.o \
+    ggml-alloc.o \
+    ggml-backend.o \
+    ggml-cpu-cxx.o \
+    ggml-cpu.o \
+    ggml-opt.o \
+    ggml-quants.o \
+    ggml-threading.o \
+    ggml.o \
+    gguf.o \
+    hbm.o \
+    llama-adapter.o \
+    llama-arch.o \
+    llama-batch.o \
+    llama-chat.o \
+    llama-context.o \
+    llama-cparams.o \
+    llama-grammar.o \
+    llama-graph.o \
+    llama-hparams.o \
+    llama-impl.o \
+    llama-io.o \
+    llama-kv-cache-iswa.o \
+    llama-kv-cache.o \
+    llama-memory-hybrid.o \
+    llama-memory-recurrent.o \
+    llama-memory.o \
+    llama-mmap.o \
+    llama-model-loader.o \
+    llama-model-saver.o \
+    llama-model.o \
+    llama-quant.o \
+    llama-sampling.o \
+    llama-vocab.o \
+    llama.o \
+    cpu_shim.o \
+    ops.o \
+    repack.o \
+    traits.o \
+    unary-ops.o \
+    unicode-data.o \
+    unicode.o \
+    vec.o \
+    interface.o \
+    quants.o \
+    init.o
+
+## No external libs: link only the objects above
+## On macOS you may optionally add Accelerate for BLAS: uncomment next line
+PKG_LIBS += -pthread
+# PKG_LIBS += -framework Accelerate
+
+## Rcpp headers are resolved via LinkingTo; no hardcoded include path needed
+
+# Explicit rule: build C++ CPU backend object from ggml-cpu.cpp to avoid name collision with ggml-cpu.c
+ggml-cpu-cxx.o: ggml-cpu.cpp
+	$(CXX) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) -c $< -o $@
+PKG_LIBS += -Wl,-undefined,error
