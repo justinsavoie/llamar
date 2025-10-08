@@ -18,8 +18,7 @@ jobs:
           r-version: '4.2.2'
           use-public-rspm: true
 
-      # Install Rtools via Chocolatey and add to PATH
-      - name: Install Rtools
+      - name: Install Rtools (via Chocolatey) and add to PATH
         shell: powershell
         run: |
           choco install rtools -y
@@ -30,6 +29,7 @@ jobs:
         shell: Rscript {0}
         run: |
           cat(R.version.string, "\n")
+          system("tar --version")
           system("g++ --version")
           system("make --version")
 
@@ -38,27 +38,36 @@ jobs:
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
 
-      # Build source and binary using R's internal tar (fixes 'invalid octal digit')
-      - name: Build source tarball and Windows binary (force internal tar)
+      # IMPORTANT: use external tar.exe from Rtools for BOTH build and install
+      - name: Build source tarball and Windows binary (use Rtools tar.exe)
         shell: Rscript {0}
         run: |
-          Sys.setenv(TAR = "internal")  # critical for Windows tar issues
-          # 1) Build source tarball
-          status <- system2(file.path(R.home("bin"), "R"),
-                            args = c("CMD", "build", ".", "--no-manual", "--no-build-vignettes"))
-          if (status != 0) stop("R CMD build failed with status ", status)
+          # Find Rtools tar.exe
+          tar_path <- Sys.which("tar")
+          if (nzchar(tar_path)) {
+            message("Using tar at: ", tar_path)
+          } else {
+            stop("tar.exe not found on PATH (Rtools not installed or PATH not set).")
+          }
 
-          # 2) Find newest tarball robustly in R
+          # Force external tar for both steps
+          Sys.setenv(TAR = tar_path)
+
+          # 1) Build source tarball
+          st <- system2(file.path(R.home("bin"), "R"),
+                        args = c("CMD", "build", ".", "--no-manual", "--no-build-vignettes"))
+          if (st != 0) stop("R CMD build failed with status ", st)
+
+          # 2) Pick newest tarball robustly in R
           tb <- dir(pattern = "[.]tar[.]gz$", full.names = TRUE)
           if (!length(tb)) stop("No source tarball (*.tar.gz) found after build")
           tb <- tb[which.max(file.mtime(tb))]
           message("Building binary from: ", tb)
 
-          # 3) Build Windows ZIP from the tarball (still using internal tar)
-          Sys.setenv(TAR = "internal")
-          status <- system2(file.path(R.home("bin"), "R"),
-                            args = c("CMD", "INSTALL", "--build", shQuote(tb)))
-          if (status != 0) stop("R CMD INSTALL --build failed with status ", status)
+          # 3) Build Windows ZIP from tarball (still using external tar.exe)
+          st <- system2(file.path(R.home("bin"), "R"),
+                        args = c("CMD", "INSTALL", "--build", shQuote(tb)))
+          if (st != 0) stop("R CMD INSTALL --build failed with status ", st)
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v4
