@@ -18,21 +18,37 @@ jobs:
           r-version: '4.2.2'
           use-public-rspm: true
 
-      # 🟢 NEW STEP — install dependencies from CRAN
+      - name: Set up Rtools (required to build packages on Windows)
+        uses: r-lib/actions/setup-rtools@v2
+
       - name: Install R dependencies
+        shell: Rscript {0}
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
+
+      # 🔁 REPLACE your two bash steps with this single R step
+      - name: Build source tarball and Windows binary (force internal tar)
         shell: Rscript {0}
-
-      - name: Build source tarball
-        shell: bash
-        run: R CMD build .
-
-      - name: Build Windows binary ZIP
-        shell: bash
         run: |
-          SRC=$(ls -1 *.tar.gz | tail -n1)
-          R CMD INSTALL --build "$SRC"
+          # Always use R's internal tar on Windows to avoid "invalid octal digit"
+          Sys.setenv(TAR = "internal")
+
+          # 1) Build source tarball
+          build_status <- system2(file.path(R.home("bin"), "R"),
+                                  args = c("CMD", "build", ".", "--no-manual", "--no-build-vignettes"))
+          if (build_status != 0) stop("R CMD build failed with status ", build_status)
+
+          # 2) Find the newest tarball
+          tb <- dir(pattern = "[.]tar[.]gz$", full.names = TRUE)
+          if (!length(tb)) stop("No source tarball (*.tar.gz) found after build")
+          tb <- tb[which.max(file.mtime(tb))]
+          message("Building binary from: ", tb)
+
+          # 3) Build Windows ZIP from the tarball (still using internal tar)
+          Sys.setenv(TAR = "internal")
+          zip_status <- system2(file.path(R.home("bin"), "R"),
+                                args = c("CMD", "INSTALL", "--build", tb))
+          if (zip_status != 0) stop("R CMD INSTALL --build failed with status ", zip_status)
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v4
