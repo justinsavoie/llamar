@@ -1,21 +1,22 @@
 name: Build Windows binary (ZIP)
 
 on:
-  workflow_dispatch:   # lets you click “Run workflow”
+  workflow_dispatch:
   push:
-    tags: ["v*"]       # also runs when you push a tag like v0.1.0
+    tags: ["v*"]
 
 jobs:
   win-zip:
-    runs-on: windows-latest          # <-- GitHub gives you a Windows VM
+    runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: r-lib/actions/setup-r@v2
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.2.2'         # pick the R version you target
-
-      - uses: r-lib/actions/setup-rtools@v2  # installs the Windows R toolchain
+          r-version: '4.2.2'        # target R version
+          use-public-rspm: true
 
       - name: Build source tarball
         shell: bash
@@ -25,9 +26,9 @@ jobs:
         shell: bash
         run: |
           SRC=$(ls -1 *.tar.gz | tail -n1)
-          R CMD INSTALL --build "$SRC"   # produces llam ar_*.zip
+          R CMD INSTALL --build "$SRC"
 
-      - name: Upload ZIP artifact
+      - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
           name: win-binary-zip
