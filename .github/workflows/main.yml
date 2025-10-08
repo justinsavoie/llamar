@@ -10,7 +10,8 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repo
+        uses: actions/checkout@v4
 
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
@@ -18,7 +19,7 @@ jobs:
           r-version: '4.2.2'
           use-public-rspm: true
 
-      - name: Install Rtools
+      - name: Install Rtools (rtools42) and add to PATH
         shell: powershell
         run: |
           choco install rtools -y
@@ -28,49 +29,56 @@ jobs:
       - name: Verify toolchain
         shell: bash
         run: |
-          which tar
-          tar --version
-          g++ --version
+          which tar || true
+          tar --version || true
+          g++ --version || true
+          R --version
 
       - name: Install R dependencies
         shell: Rscript {0}
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
 
-- name: Build and install package directly (no tarball)
-  shell: Rscript {0}
-  env:
-    TAR: C:/rtools42/usr/bin/tar.exe
-    MAKEFLAGS: -j1
-  run: |
-    # show which Makevars.win is used
-    cat("Using Makevars.win at:\n", normalizePath(file.path("src","Makevars.win")), "\n")
-    writeLines(readLines(file.path("src","Makevars.win")))
-
-    pkg_lib <- "llamar.install"
-    dir.create(pkg_lib, showWarnings = FALSE)
-
-    # verbose install, no test-load to avoid failing if DLL missing at first
-    st <- system2(file.path(R.home("bin"), "R"),
-                  args = c("CMD", "INSTALL",
-                           "--no-multiarch",
-                           "--no-test-load",
-                           "--clean",
-                           "--preclean",
-                           "--debug",
-                           paste0("--library=", pkg_lib),
-                           "."),
-                  stdout = "", stderr = "")
-    if (st != 0) stop("R CMD INSTALL failed with status ", st)
-
-      - name: Create ZIP manually
-        shell: bash
+      - name: Build and install package directly (no tarball)
+        shell: Rscript {0}
+        env:
+          TAR: C:/rtools42/usr/bin/tar.exe   # ensure bsdtar, avoid Windows tar issues
+          MAKEFLAGS: -j1                      # serialize to make logs deterministic
         run: |
-          cd llamar.install
-          zip -r ../llamar_win_binary.zip *
-          cd ..
+          cat("Using Makevars.win at:\n", normalizePath(file.path("src","Makevars.win")), "\n\n")
+          if (file.exists(file.path("src","Makevars.win"))) {
+            cat(readLines(file.path("src","Makevars.win")), sep = "\n")
+          } else {
+            cat("WARNING: src/Makevars.win not found\n")
+          }
+          cat("\n---- Starting R CMD INSTALL ----\n")
 
-      - name: Upload ZIP
+          pkg_lib <- "llamar.install"
+          dir.create(pkg_lib, showWarnings = FALSE)
+
+          # Install directly from the working tree; no --build to avoid tar packaging step
+          st <- system2(file.path(R.home("bin"), "R"),
+                        args = c("CMD", "INSTALL",
+                                 "--no-multiarch",
+                                 "--no-test-load",
+                                 "--clean",
+                                 "--preclean",
+                                 paste0("--library=", pkg_lib),
+                                 "."))
+          if (st != 0) stop("R CMD INSTALL failed with status ", st)
+          cat("Install OK into: ", normalizePath(pkg_lib), "\n")
+
+      - name: Create ZIP of installed package
+        shell: powershell
+        run: |
+          $src = "llamar.install"
+          if (-not (Test-Path $src)) { throw "Install dir not found: $src" }
+          $zip = "llamar_win_binary.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "$src\*" -DestinationPath $zip
+          Write-Host "Created $zip"
+
+      - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: win-binary-zip
