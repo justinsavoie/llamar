@@ -1,14 +1,17 @@
-# src/Makevars.win (CPU-only)
-PKG_CPPFLAGS = -I. -I./ggml-cpu \
+# src/Makevars.win — CPU-only build for llama.cpp minimal
+
+PKG_CPPFLAGS = -I. -I./ggml \
   -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\" \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
+PKG_LIBS     = -lm
 
+# List only the objects you really need
+OBJS = ggml.o ggml-cpu.o cpu_shim.o
 
-# OpenMP not used; if you later add it, uncomment:
-# PKG_LIBS += -fopenmp
+all: $(SHLIB)
 
-# Keep instruction set generic so it runs on most CPUs
-# (If you know your audience supports AVX2, you can add -mavx2 -mfma)
+$(SHLIB): $(OBJS)
+	$(SHLIB_LINK) -o $@ $(OBJS) $(PKG_LIBS)
