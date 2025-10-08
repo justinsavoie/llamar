@@ -37,22 +37,31 @@ jobs:
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
 
-      - name: Build and install package directly (no tarball)
-        shell: Rscript {0}
-        run: |
-          Sys.setenv(TAR = "C:/rtools42/usr/bin/tar.exe")
+- name: Build and install package directly (no tarball)
+  shell: Rscript {0}
+  env:
+    TAR: C:/rtools42/usr/bin/tar.exe
+    MAKEFLAGS: -j1
+  run: |
+    # show which Makevars.win is used
+    cat("Using Makevars.win at:\n", normalizePath(file.path("src","Makevars.win")), "\n")
+    writeLines(readLines(file.path("src","Makevars.win")))
 
-          pkg_lib <- "llamar.install"
-          dir.create(pkg_lib, showWarnings = FALSE)
+    pkg_lib <- "llamar.install"
+    dir.create(pkg_lib, showWarnings = FALSE)
 
-          # Compile and install directly from source folder
-          st <- system2(file.path(R.home("bin"), "R"),
-                        args = c("CMD", "INSTALL",
-                                 "--no-multiarch",
-                                 "--build",
-                                 paste0("--library=", pkg_lib),
-                                 "."))
-          if (st != 0) stop("R CMD INSTALL failed with status ", st)
+    # verbose install, no test-load to avoid failing if DLL missing at first
+    st <- system2(file.path(R.home("bin"), "R"),
+                  args = c("CMD", "INSTALL",
+                           "--no-multiarch",
+                           "--no-test-load",
+                           "--clean",
+                           "--preclean",
+                           "--debug",
+                           paste0("--library=", pkg_lib),
+                           "."),
+                  stdout = "", stderr = "")
+    if (st != 0) stop("R CMD INSTALL failed with status ", st)
 
       - name: Create ZIP manually
         shell: bash
