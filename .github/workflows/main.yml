@@ -18,56 +18,55 @@ jobs:
           r-version: '4.2.2'
           use-public-rspm: true
 
-      - name: Install Rtools (via Chocolatey) and fix PATH order
+      - name: Install Rtools
         shell: powershell
         run: |
           choco install rtools -y
-          # make sure Rtools tar.exe is used *before* Windows tar.exe
           echo "C:\rtools42\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
           echo "C:\rtools42\x86_64-w64-mingw32.static.posix\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
-          # remove Windows tar from PATH so it can't override
-          $env:PATH = ($env:PATH -split ';' | Where-Object {$_ -notmatch 'System32'}) -join ';'
 
-      - name: Verify tar source
+      - name: Verify toolchain
         shell: bash
         run: |
           which tar
           tar --version
+          g++ --version
 
       - name: Install R dependencies
         shell: Rscript {0}
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
 
-      - name: Build source tarball and Windows binary using Rtools tar
+      - name: Build and install (no --build)
         shell: Rscript {0}
         run: |
-          # Force correct tar (Rtools bsdtar)
-          tar_path <- "C:/rtools42/usr/bin/tar.exe"
-          if (!file.exists(tar_path)) stop("Rtools tar.exe not found: ", tar_path)
-          Sys.setenv(TAR = tar_path)
-
-          message("Using tar: ", tar_path)
+          Sys.setenv(TAR = "C:/rtools42/usr/bin/tar.exe")
 
           # 1) Build source tarball
           st <- system2(file.path(R.home("bin"), "R"),
                         args = c("CMD", "build", ".", "--no-manual", "--no-build-vignettes"))
           if (st != 0) stop("R CMD build failed with status ", st)
 
-          # 2) Pick newest tarball
           tb <- dir(pattern = "[.]tar[.]gz$", full.names = TRUE)
-          if (!length(tb)) stop("No source tarball (*.tar.gz) found")
           tb <- tb[which.max(file.mtime(tb))]
-          message("Building binary from: ", tb)
+          message("Installing from: ", tb)
 
-          # 3) Use Rtools tar for INSTALL too
-          Sys.setenv(TAR = tar_path)
+          # 2) Install to a temporary folder
+          pkg_lib <- "llamar.install"
+          dir.create(pkg_lib, showWarnings = FALSE)
           st <- system2(file.path(R.home("bin"), "R"),
-                        args = c("CMD", "INSTALL", "--build", shQuote(tb)))
-          if (st != 0) stop("R CMD INSTALL --build failed with status ", st)
+                        args = c("CMD", "INSTALL", "--library=" %+% pkg_lib, shQuote(tb)))
+          if (st != 0) stop("R CMD INSTALL failed with status ", st)
+
+      - name: Create ZIP manually
+        shell: bash
+        run: |
+          cd llamar.install
+          zip -r ../llamar_win_binary.zip *
+          cd ..
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
           name: win-binary-zip
-          path: ./*.zip
+          path: llamar_win_binary.zip
