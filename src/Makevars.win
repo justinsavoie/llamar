@@ -15,3 +15,13 @@ all: $(SHLIB)
 
 $(SHLIB): $(OBJS)
 	$(SHLIB_LINK) -o $@ $(OBJS) $(PKG_LIBS)
+
+.SUFFIXES:
+
+.SUFFIXES: .c .cpp .o
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
