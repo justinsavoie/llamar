@@ -11,9 +11,9 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
 
-# 🚨 This list is the key: ONLY these will be built/linked
+# Full list of object files (CPU-only)
 OBJECTS = \
-  ggml.o ggml-cpu.o ggml-backend.o ggml-alloc.o \
+  ggml.o ggml-cpu.o ggml-backend.o ggml-alloc.o ggml-threading.o \
   cpu_shim.o interface.o \
   llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o \
   llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o \
@@ -22,14 +22,12 @@ OBJECTS = \
   llama-sampling.o llama-vocab.o gguf.o \
   unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o
 
-# Generic compile rules (used only for the files in OBJECTS)
+# Generic compile rules
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
-
-# No custom link rule; R will link $(OBJECTS) into the DLL
 
 clean:
 	-del *.o *.dll 2>nul || rm -f *.o *.dll
