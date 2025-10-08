@@ -37,25 +37,21 @@ jobs:
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
 
-      - name: Build and install (no --build)
+      - name: Build and install package directly (no tarball)
         shell: Rscript {0}
         run: |
           Sys.setenv(TAR = "C:/rtools42/usr/bin/tar.exe")
 
-          # 1) Build source tarball
-          st <- system2(file.path(R.home("bin"), "R"),
-                        args = c("CMD", "build", ".", "--no-manual", "--no-build-vignettes"))
-          if (st != 0) stop("R CMD build failed with status ", st)
-
-          tb <- dir(pattern = "[.]tar[.]gz$", full.names = TRUE)
-          tb <- tb[which.max(file.mtime(tb))]
-          message("Installing from: ", tb)
-
-          # 2) Install to a temporary folder
           pkg_lib <- "llamar.install"
           dir.create(pkg_lib, showWarnings = FALSE)
-          cmd <- c("CMD", "INSTALL", paste0("--library=", pkg_lib), shQuote(tb))
-          st <- system2(file.path(R.home("bin"), "R"), args = cmd)
+
+          # Compile and install directly from source folder
+          st <- system2(file.path(R.home("bin"), "R"),
+                        args = c("CMD", "INSTALL",
+                                 "--no-multiarch",
+                                 "--build",
+                                 paste0("--library=", pkg_lib),
+                                 "."))
           if (st != 0) stop("R CMD INSTALL failed with status ", st)
 
       - name: Create ZIP manually
