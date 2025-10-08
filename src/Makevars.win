@@ -1,7 +1,7 @@
+# ---------- src/Makevars.win (CPU-only, explicit objects) ----------
+
 .SUFFIXES:
 .SUFFIXES: .c .cpp .o
-
-# src/Makevars.win — CPU-only build for llama.cpp minimal
 
 PKG_CPPFLAGS = -I. -I./ggml-cpu \
   -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\" \
@@ -11,18 +11,25 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
 
-OBJS = ggml.o ggml-cpu.o cpu_shim.o
+# 🚨 This list is the key: ONLY these will be built/linked
+OBJECTS = \
+  ggml.o ggml-cpu.o ggml-backend.o ggml-alloc.o \
+  cpu_shim.o interface.o \
+  llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o \
+  llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o \
+  llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o \
+  llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o \
+  llama-sampling.o llama-vocab.o gguf.o \
+  unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o
 
+# Generic compile rules (used only for the files in OBJECTS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
-all: $(SHLIB)
-
-$(SHLIB): $(OBJS)
-	$(SHLIB_LINK) -o $@ $(OBJS) $(PKG_LIBS)
+# No custom link rule; R will link $(OBJECTS) into the DLL
 
 clean:
-	rm -f *.o *.dll
+	-del *.o *.dll 2>nul || rm -f *.o *.dll
