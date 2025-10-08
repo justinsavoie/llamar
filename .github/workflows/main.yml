@@ -54,8 +54,8 @@ jobs:
           # 2) Install to a temporary folder
           pkg_lib <- "llamar.install"
           dir.create(pkg_lib, showWarnings = FALSE)
-          st <- system2(file.path(R.home("bin"), "R"),
-                        args = c("CMD", "INSTALL", "--library=" %+% pkg_lib, shQuote(tb)))
+          cmd <- c("CMD", "INSTALL", paste0("--library=", pkg_lib), shQuote(tb))
+          st <- system2(file.path(R.home("bin"), "R"), args = cmd)
           if (st != 0) stop("R CMD INSTALL failed with status ", st)
 
       - name: Create ZIP manually
