@@ -1,6 +1,11 @@
 # src/Makevars.win — CPU-only build for llama.cpp minimal
 
-PKG_CPPFLAGS = -I. -I./ggml \
+# --- Disable all implicit suffix rules first ---
+.SUFFIXES:
+.SUFFIXES: .c .cpp .o
+
+# --- Compiler & preprocessor flags ---
+PKG_CPPFLAGS = -I. -I./ggml-cpu \
   -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\" \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
@@ -8,20 +13,18 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
 
-# List only the objects you really need
+# --- Explicitly list what to compile ---
 OBJS = ggml.o ggml-cpu.o cpu_shim.o
 
-all: $(SHLIB)
-
-$(SHLIB): $(OBJS)
-	$(SHLIB_LINK) -o $@ $(OBJS) $(PKG_LIBS)
-
-.SUFFIXES:
-
-.SUFFIXES: .c .cpp .o
-
+# --- Custom compile rules ---
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+
+# --- Build the shared library ---
+all: $(SHLIB)
+
+$(SHLIB): $(OBJS)
+	$(SHLIB_LINK) -o $@ $(OBJS) $(PKG_LIBS)
