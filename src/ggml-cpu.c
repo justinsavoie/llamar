@@ -2425,22 +2425,43 @@ static bool ggml_thread_apply_priority(int32_t prio) {
         case GGML_SCHED_PRIO_REALTIME: p = THREAD_PRIORITY_TIME_CRITICAL; break;
     }
 
-    if (prio != GGML_SCHED_PRIO_LOW) {
+    //if (prio != GGML_SCHED_PRIO_LOW) {
         // Tell Windows that this thread should not be throttled (needs its own CPU core).
         // Newer Windows 11 versions aggresively park (offline) CPU cores and often place
         // all our threads onto the first 4 cores which results in terrible performance with
         // n_threads > 4
-        #if _WIN32_WINNT >= 0x0602
-        THREAD_POWER_THROTTLING_STATE t;
-        ZeroMemory(&t, sizeof(t));
-        t.Version     = THREAD_POWER_THROTTLING_CURRENT_VERSION;
-        t.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
-        t.StateMask   = 0;
+    //    #if _WIN32_WINNT >= 0x0602
+    //    THREAD_POWER_THROTTLING_STATE t;
+    //    ZeroMemory(&t, sizeof(t));
+    //    t.Version     = THREAD_POWER_THROTTLING_CURRENT_VERSION;
+    //    t.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
+    //    t.StateMask   = 0;
 
-        if (!SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &t, sizeof(t))) {
-            GGML_LOG_DEBUG("failed to disable thread power throttling %d : (%d)\n", prio, (int) GetLastError());
-            return false;
-        }
+    //    if (!SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &t, sizeof(t))) {
+    //        GGML_LOG_DEBUG("failed to disable thread power throttling %d : (%d)\n", prio, (int) GetLastError());
+    //        return false;
+    //    }
+    //    #endif
+    //}
+    if (prio != GGML_SCHED_PRIO_LOW) {
+        // Tell Windows that this thread should not be throttled (needs its own CPU core).
+        // NOTE:
+        // This code relies on Windows SDK types that are not available under MinGW / Rtools.
+        // We disable it for non-MSVC builds to allow successful compilation on Rtools.
+        #if defined(_WIN32) && defined(_MSC_VER) && _WIN32_WINNT >= 0x0602
+            THREAD_POWER_THROTTLING_STATE t;
+            ZeroMemory(&t, sizeof(t));
+            t.Version     = THREAD_POWER_THROTTLING_CURRENT_VERSION;
+            t.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
+            t.StateMask   = 0;
+
+            if (!SetThreadInformation(GetCurrentThread(), ThreadPowerThrottling, &t, sizeof(t))) {
+                GGML_LOG_DEBUG("failed to disable thread power throttling %d : (%d)\n", prio, (int) GetLastError());
+                return false;
+            }
+        #else
+            // Skip thread power throttling setup on MinGW/Rtools builds
+            (void)prio;
         #endif
     }
 
