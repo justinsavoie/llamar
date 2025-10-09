@@ -1,17 +1,19 @@
-# ---------- src/Makevars.win (CPU-only, force-include version header) ----------
+# ---------- src/Makevars.win (CPU-only, build static lib + let R link) ----------
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
 
-# Force-include ggml-version.h so ggml.c always sees GGML_VERSION / GGML_COMMIT
+# Make ggml.c see version macros on every compile
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
-PKG_LIBS     = -lm
 
-# ---------------- sources we actually need (no ggml-opt.cpp) ----------------
+# IMPORTANT: link the static lib via PKG_LIBS (no custom $(SHLIB) recipe!)
+PKG_LIBS = $(LIBNAME) -lm
+
+# ---- sources to go into the static library (no ggml-opt.cpp) ----
 CORE_C = \
   ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c
 
@@ -26,31 +28,33 @@ CORE_CPP = \
   llama-mmap.cpp llama-model.cpp llama-model-loader.cpp llama-model-saver.cpp \
   llama-quant.cpp llama-sampling.cpp llama-vocab.cpp llama-adapter.cpp
 
-# your package-facing files
-PKG_CPP = interface.cpp cpu_shim.cpp
-
 LIBOBJS = $(CORE_C:.c=.o) $(CORE_CPP:.cpp=.o)
-OBJECTS = $(PKG_CPP:.cpp=.o)
 LIBNAME = libllama.a
+
+# ---- package-facing objects that R should link into the DLL ----
+OBJECTS = interface.o cpu_shim.o
 
 $(info >>> LIBOBJS=$(LIBOBJS))
 $(info >>> OBJECTS=$(OBJECTS))
 $(info >>> SHLIB=$(SHLIB))
 
-# ---------------- rules (use ALL_* so PKG_* flags propagate) ----------------
+# ---- compile rules (use ALL_* so PKG_* flags propagate) ----
 %.o: %.c
 	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
+# Build the static library with all ggml/llama objects
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
 
-all: $(SHLIB)
+# Tell R's default linker rule that the DLL also depends on our static lib
+# (This adds a prerequisite only; we DO NOT override the $(SHLIB) recipe.)
+$(SHLIB): $(LIBNAME)
 
-$(SHLIB): $(LIBNAME) $(OBJECTS)
-	$(SHLIB_LINK) -o $@ $(OBJECTS) $(LIBNAME) $(PKG_LIBS)
+# Default target
+all: $(SHLIB)
 
 clean:
 	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
