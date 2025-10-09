@@ -1,8 +1,7 @@
+// src/cpu_shim.cpp
 #include "ggml-backend.h"
-
-// Match the CPU initializer's C linkage (as exported in ggml-cpu.cpp)
-extern "C" ggml_backend_t ggml_backend_cpu_init(void);
+#include "ggml-cpu.h"   // declares ggml_backend_init_cpu()
 
 extern "C" ggml_backend_t llamar_cpu_init_shim(void) {
-    return ggml_backend_cpu_init();
+    return ggml_backend_init_cpu();
 }
