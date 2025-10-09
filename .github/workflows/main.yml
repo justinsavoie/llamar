@@ -38,12 +38,12 @@ jobs:
         shell: Rscript {0}
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
-
+      
       - name: Build and install package directly (no tarball)
         shell: Rscript {0}
         env:
           TAR: C:/rtools42/usr/bin/tar.exe   # ensure bsdtar, avoid Windows tar issues
-          MAKEFLAGS: -j1                      # serialize to make logs deterministic
+          MAKEFLAGS: --debug=v -j1
         run: |
           cat("Using Makevars.win at:\n", normalizePath(file.path("src","Makevars.win")), "\n\n")
           if (file.exists(file.path("src","Makevars.win"))) {
