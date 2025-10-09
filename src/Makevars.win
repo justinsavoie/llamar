@@ -1,6 +1,5 @@
-# ---------- src/Makevars.win (CPU-only: build a static lib, then link) ----------
+# ---------- src/Makevars.win (CPU-only: build static lib first, then let R link) ----------
 
-# CI debug
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
@@ -11,11 +10,15 @@ PKG_CPPFLAGS = -I. -I./ggml-cpu \
 
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
-PKG_LIBS     = -lm
 
-# ---- Build the static library with EVERYTHING we need ----
+# we’ll link against our static library + libm
+PKG_LIBS = $(PKG_LIBS) libllama.a -lm
+
+# R’s make uses OBJECTS when linking the DLL
+OBJECTS = cpu_shim.o interface.o
+
+# Build this static library from all ggml/llama .c/.cpp sources
 LIBNAME  = libllama.a
-
 # (single line; no trailing spaces)
 LIBOBJS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quants.o \
           ggml-cpu.o ggml-cpu-xx.o \
@@ -24,17 +27,12 @@ LIBOBJS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quan
           llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o \
           llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o \
           llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o \
-          llama-sampling.o llama-vocab.o llama-adapter.o \
-          ggml-opt.o
+          llama-sampling.o llama-vocab.o llama-adapter.o ggml-opt.o
 
-# ---- The DLL will only compile/link these small glue objs and the static lib ----
-OBJECTS = cpu_shim.o interface.o
+# Ensure the static lib exists BEFORE R’s default 'shlib' link step runs
+shlib: $(LIBNAME)
 
-$(info >>> LIBOBJS=$(LIBOBJS))
-$(info >>> OBJECTS=$(OBJECTS))
-$(info >>> SHLIB=$(SHLIB))
-
-# Compile rules – use ALL_* so PKG_* flags propagate
+# Pattern rules (use ALL_* so PKG_* flags propagate)
 %.o: %.c
 	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
@@ -45,15 +43,9 @@ $(info >>> SHLIB=$(SHLIB))
 ggml-cpu-xx.o: ggml-cpu.cpp
 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
-# Build the static library first
+# Build the static library
 $(LIBNAME): $(LIBOBJS)
-	ar rcs $@ $(LIBOBJS)
-
-# Explicit link rule for the package DLL
-all: $(SHLIB)
-
-$(SHLIB): $(OBJECTS) $(LIBNAME)
-	$(SHLIB_LINK) -o $@ $(OBJECTS) $(LIBNAME) $(PKG_LIBS)
+	$(AR) rcs $@ $(LIBOBJS)
 
 clean:
 	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
