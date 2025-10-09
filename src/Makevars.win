@@ -19,7 +19,7 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_LIBS = $(LIBNAME) -lm
 
 # ---------------- sources for the static lib ----------------
-# NOTE: include ggml-backend.c (defines ggml_backend_cpu_init)
+# Include ggml-backend.c (defines ggml_backend_cpu_init)
 CORE_C = \
   ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c ggml-backend.c
 
