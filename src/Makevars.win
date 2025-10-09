@@ -1,56 +1,40 @@
-# ---------- src/Makevars.win (CPU-only: build lib, then link DLL) ----------
+# ---------- src/Makevars.win (CPU-only; enumerate all objects, no .a) ----------
 
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
 
+# Preprocessor / flags
 PKG_CPPFLAGS = -I. -I./ggml-cpu \
   -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\" \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
-PKG_LIBS     =    # keep empty; add -lm only in the final link
+PKG_LIBS     = -lm
 
-# --- static lib with all llama/ggml sources ---
-LIBNAME = libllama.a
-# ONE line, no trailing spaces:
-LIBOBJS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quants.o \
-          ggml-cpu.o ggml-cpu-xx.o \
+# IMPORTANT: Explicit list of ALL needed objects (ONE line, no trailing space)
+OBJECTS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quants.o ggml-cpu.o \
           gguf.o unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o \
           llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o \
           llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o \
           llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o \
           llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o \
-          llama-sampling.o llama-vocab.o llama-adapter.o ggml-opt.o
+          llama-sampling.o llama-vocab.o llama-adapter.o ggml-opt.o \
+          cpu_shim.o interface.o
 
-# objects that expose the R pkg API
-OBJECTS = cpu_shim.o interface.o
+# NOTE:
+# - We compile ggml-cpu.c (C version) and DO NOT compile ggml-cpu.cpp.
+# - No static lib (.a) is created; R’s default winshlib.mk will link $(OBJECTS) into $(SHLIB).
+# - This avoids archive extraction/link-order pitfalls that caused your undefined references.
 
-# default target
-all: $(SHLIB)
-
-# make the static lib
-$(LIBNAME): $(LIBOBJS)
-	$(AR) rcs $@ $(LIBOBJS)
-	$(RANLIB) $@  # harmless if empty
-
-# compile rules (use ALL_* so PKG_* flags are included)
+# Pattern rules (use ALL_* so PKG_* flags propagate)
 %.o: %.c
 	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
+
 %.o: %.cpp
 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
-# avoid name clash: both ggml-cpu.c and ggml-cpu.cpp exist
-ggml-cpu-xx.o: ggml-cpu.cpp
-	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
-
-# final link: link the shim + the archive + (crucially) all provider OBJS
-# this guarantees every llama_* symbol is present
-$(SHLIB): $(LIBNAME) $(OBJECTS)
-	$(SHLIB_LINK) -o $@ \
-	  $(OBJECTS) -Wl,--start-group $(LIBNAME) -Wl,--end-group \
-	  $(LIBOBJS) -lm
-
+# No custom $(SHLIB) rule — rely on R's default
 clean:
-	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
+	-del *.o *.dll 2>nul || rm -f *.o *.dll
