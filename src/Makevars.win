@@ -3,7 +3,7 @@
 .SUFFIXES:
 .SUFFIXES: .c .cpp .o
 
-# Ensure ggml-version.h is force-included so GGML_VERSION / GGML_COMMIT exist
+# Make sure ggml-version.h is force-included so GGML_VERSION / GGML_COMMIT exist
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
@@ -11,18 +11,10 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
 
-# Only compile the sources you actually need (no ggml.cpp!)
-OBJECTS = \
-  ggml.o ggml-cpu.o ggml-backend.o ggml-alloc.o \
-  cpu_shim.o interface.o \
-  llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o \
-  llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o \
-  llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o \
-  llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o \
-  llama-sampling.o llama-vocab.o gguf.o \
-  unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o
+# IMPORTANT: keep this on ONE line so OBJECTS is definitely non-empty
+OBJECTS = ggml.o ggml-cpu.o ggml-backend.o ggml-alloc.o cpu_shim.o interface.o llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o llama-sampling.o llama-vocab.o gguf.o unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o
 
-# Compile rules (R will link automatically using $(OBJECTS))
+# Compile rules (R’s default winshlib.mk will link $(OBJECTS) into the DLL)
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
