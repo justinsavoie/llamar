@@ -1,12 +1,11 @@
 # ---------- src/Makevars.win (CPU-only, llama.cpp minimal) ----------
 
-# Tell us what make sees:
+# Debug echo (handy in CI)
 $(info >>> Using Makevars.win)
-$(info >>> R_HOME = $(R_HOME))
-$(info >>> CC = $(CC))
-$(info >>> CXX = $(CXX))
+$(info >>> CC=$(CC))
+$(info >>> CXX=$(CXX))
 
-# Define version/commit macros *here* so ggml.c can see them
+# Preprocessor / flags (these feed into ALL_CPPFLAGS/ALL_*FLAGS)
 PKG_CPPFLAGS = -I. -I./ggml-cpu \
   -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\" \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
@@ -15,23 +14,18 @@ PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
 
-# SINGLE LINE (no trailing spaces)
+# Keep on ONE line (no trailing space)
 OBJECTS = ggml.o ggml-cpu.o ggml-backend.o ggml-alloc.o cpu_shim.o interface.o llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o llama-sampling.o llama-vocab.o gguf.o unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o
 
-$(info >>> OBJECTS=$(OBJECTS))
-$(info >>> SHLIB=$(SHLIB))
-
-# Compile rules
+# Compile rules – IMPORTANT: use ALL_*FLAGS so PKG_* are included
 %.o: %.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(CC) $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
-# Explicit link target
-all: $(SHLIB)
-$(SHLIB): $(OBJECTS)
-	$(SHLIB_LINK) -o $@ $(OBJECTS) $(PKG_LIBS)
+# Let R's default winshlib.mk link $(OBJECTS) into $(SHLIB)
+# (No explicit $(SHLIB) rule here – avoids override warnings)
 
 clean:
 	-del *.o *.dll 2>nul || rm -f *.o *.dll
