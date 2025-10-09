@@ -1,31 +1,22 @@
-// cpu_shim.cpp — resolve CPU backend across ggml versions
+// cpu_shim.cpp — resolves the CPU backend symbol across ggml snapshots
 extern "C" {
     #include "ggml-backend.h"
-    // include the CPU header if present (some trees have only ggml-backend.h)
+    // Some trees also ship a separate CPU header:
     #if __has_include("ggml-cpu.h")
-    #   include "ggml-cpu.h"
+    #  include "ggml-cpu.h"
     #endif
 
-    // forward-declare both possible exports (only one will exist in your tree)
+    // Declare both possible exports (only one exists in your tree)
     ggml_backend_t ggml_backend_cpu_init(void);   // older ggml
     ggml_backend_t ggml_backend_init_cpu(void);   // newer ggml
 }
 
-// Use whichever one the headers actually declared.
-// We can’t test for symbol presence at link time, so use
-// preprocessor detection against the header content.
+// Prefer the newer name if the header provided a prototype; otherwise call the old one.
 extern "C" ggml_backend_t llamar_cpu_init_shim(void) {
-    // prefer the newer name when it’s declared
-    #if defined(__cplusplus)
-        // if the newer function is declared in ggml-cpu.h, there will be a prototype
-        #if defined(ggml_backend_init_cpu) || (defined(__has_include) && __has_include("ggml-cpu.h"))
-            // Many trees still only have the old name; call and let the linker resolve the one that exists.
-            // Try new name first if it’s available to the compiler:
-            return ggml_backend_init_cpu();
-        #else
-            return ggml_backend_cpu_init();
-        #endif
+    #if defined(__cplusplus) && defined(ggml_backend_init_cpu)
+        return ggml_backend_init_cpu();
     #else
+        // Falls back to the legacy name (present in many ggml trees)
         return ggml_backend_cpu_init();
     #endif
 }
