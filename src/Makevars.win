@@ -1,4 +1,4 @@
-# ---------- src/Makevars.win (CPU-only: build static lib first, then let R link) ----------
+# ---------- src/Makevars.win (CPU-only: build lib, then explicitly link DLL) ----------
 
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
@@ -11,15 +11,12 @@ PKG_CPPFLAGS = -I. -I./ggml-cpu \
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 
-# we’ll link against our static library + libm
-PKG_LIBS = $(PKG_LIBS) libllama.a -lm
+# we’ll add -lm at the very end; keep PKG_LIBS otherwise clean
+PKG_LIBS     =
 
-# R’s make uses OBJECTS when linking the DLL
-OBJECTS = cpu_shim.o interface.o
-
-# Build this static library from all ggml/llama .c/.cpp sources
+# -------- build static lib with all llama/ggml sources --------
 LIBNAME  = libllama.a
-# (single line; no trailing spaces)
+# single line; no trailing space
 LIBOBJS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quants.o \
           ggml-cpu.o ggml-cpu-xx.o \
           gguf.o unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o \
@@ -29,23 +26,30 @@ LIBOBJS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quan
           llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o \
           llama-sampling.o llama-vocab.o llama-adapter.o ggml-opt.o
 
-# Ensure the static lib exists BEFORE R’s default 'shlib' link step runs
-shlib: $(LIBNAME)
+# ensure lib is built before linking the shared lib
+all: $(SHLIB)
 
-# Pattern rules (use ALL_* so PKG_* flags propagate)
-%.o: %.c
-	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
-
-%.o: %.cpp
-	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
-
-# Avoid name clash: compile ggml-cpu.cpp to a unique object name
-ggml-cpu-xx.o: ggml-cpu.cpp
-	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
-
-# Build the static library
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
+
+# -------- objects that expose the R package API (small shim layer) --------
+OBJECTS = cpu_shim.o interface.o
+
+# -------- compile rules (use ALL_* so PKG_* flags propagate) --------
+%.o: %.c
+	$(CC)  $(ALL_CFLAGS)    $(ALL_CPPFLAGS) -c $< -o $@
+
+%.o: %.cpp
+	$(CXX) $(ALL_CXXFLAGS)  $(ALL_CPPFLAGS) -c $< -o $@
+
+# Avoid name clash when both ggml-cpu.c and ggml-cpu.cpp exist
+ggml-cpu-xx.o: ggml-cpu.cpp
+	$(CXX) $(ALL_CXXFLAGS)  $(ALL_CPPFLAGS) -c $< -o $@
+
+# -------- explicit link step (force the DLL to be created) --------
+# We link the small shim objects against the static lib we built.
+$(SHLIB): $(LIBNAME) $(OBJECTS)
+	$(SHLIB_LINK) -o $@ $(OBJECTS) $(LIBNAME) -lm
 
 clean:
 	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
