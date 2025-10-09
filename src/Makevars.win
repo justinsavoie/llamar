@@ -9,7 +9,7 @@ $(info >>> CXX=$(CXX))
 
 # Always expose version macros to ggml.c
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
-  -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
+  -DGGML_USE_CPU -DGGML_USE_CPU_BACKEND -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
 # Sensible warnings; hush some noisy helpers
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
@@ -18,12 +18,12 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 # Link the static lib we build below; let R's default rule produce the DLL
 PKG_LIBS = $(LIBNAME) -lm
 
-# ---------------- sources for the static lib (omit ggml-opt.cpp) ----------------
+# ---------------- sources for the static lib (include ggml-opt.cpp) ----------------
 CORE_C = \
   ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c
 
 CORE_CPP = \
-  ggml-backend.cpp ggml-threading.cpp \
+  ggml-backend.cpp ggml-threading.cpp ggml-opt.cpp \
   gguf.cpp unicode.cpp unicode-data.cpp vec.cpp \
   binary-ops.cpp unary-ops.cpp ops.cpp traits.cpp hbm.cpp repack.cpp \
   llama.cpp llama-arch.cpp llama-batch.cpp llama-chat.cpp llama-context.cpp llama-cparams.cpp \
