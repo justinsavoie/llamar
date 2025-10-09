@@ -31,38 +31,46 @@ jobs:
         run: |
           which tar || true
           tar --version || true
+          which gcc || true
+          gcc --version || true
+          which g++ || true
           g++ --version || true
           R --version
+
+      - name: Show src contents & Makevars.win (sanity)
+        shell: bash
+        run: |
+          echo "::group::src listing"
+          ls -la src || true
+          echo "::endgroup::"
+          echo "::group::Makevars.win"
+          if [ -f src/Makevars.win ]; then
+            cat src/Makevars.win
+          else
+            echo "WARNING: src/Makevars.win NOT FOUND"
+          fi
+          echo "::endgroup::"
 
       - name: Install R dependencies
         shell: Rscript {0}
         run: |
           install.packages(c("Rcpp"), repos = "https://cloud.r-project.org")
-      
-      - name: Build and install package directly (no tarball)
+
+      - name: Build & install package directly (no tarball)
         shell: Rscript {0}
         env:
-          TAR: C:/rtools42/usr/bin/tar.exe   # ensure bsdtar, avoid Windows tar issues
-          MAKEFLAGS: --debug=v -j1
+          TAR: C:/rtools42/usr/bin/tar.exe   # ensure bsdtar
+          MAKEFLAGS: -j1                     # simpler logs; no parallel make while debugging
         run: |
-          cat("Using Makevars.win at:\n", normalizePath(file.path("src","Makevars.win")), "\n\n")
-          if (file.exists(file.path("src","Makevars.win"))) {
-            cat(readLines(file.path("src","Makevars.win")), sep = "\n")
-          } else {
-            cat("WARNING: src/Makevars.win not found\n")
-          }
-          cat("\n---- Starting R CMD INSTALL ----\n")
-
+          cat("---- Starting R CMD INSTALL ----\n")
           pkg_lib <- "llamar.install"
           dir.create(pkg_lib, showWarnings = FALSE)
 
-          # Install directly from the working tree; no --build to avoid tar packaging step
           st <- system2(file.path(R.home("bin"), "R"),
-                        args = c("CMD", "INSTALL",
+                        args = c("CMD","INSTALL",
                                  "--no-multiarch",
                                  "--no-test-load",
-                                 "--clean",
-                                 "--preclean",
+                                 "--clean","--preclean",
                                  paste0("--library=", pkg_lib),
                                  "."))
           if (st != 0) stop("R CMD INSTALL failed with status ", st)
