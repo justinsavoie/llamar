@@ -11,7 +11,7 @@ PKG_CPPFLAGS = -I. -I./ggml-cpu \
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 
-# we’ll add -lm at the very end; keep PKG_LIBS otherwise clean
+# keep PKG_LIBS clean; add -lm only in the final link
 PKG_LIBS     =
 
 # -------- build static lib with all llama/ggml sources --------
@@ -31,25 +31,27 @@ all: $(SHLIB)
 
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
+	$(RANLIB) $@  # no-op if RANLIB is empty
 
 # -------- objects that expose the R package API (small shim layer) --------
 OBJECTS = cpu_shim.o interface.o
 
 # -------- compile rules (use ALL_* so PKG_* flags propagate) --------
 %.o: %.c
-	$(CC)  $(ALL_CFLAGS)    $(ALL_CPPFLAGS) -c $< -o $@
+	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
-	$(CXX) $(ALL_CXXFLAGS)  $(ALL_CPPFLAGS) -c $< -o $@
+	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
 # Avoid name clash when both ggml-cpu.c and ggml-cpu.cpp exist
 ggml-cpu-xx.o: ggml-cpu.cpp
-	$(CXX) $(ALL_CXXFLAGS)  $(ALL_CPPFLAGS) -c $< -o $@
+	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
 # -------- explicit link step (force the DLL to be created) --------
-# We link the small shim objects against the static lib we built.
+# Group the static archive so ld can resolve cross-object symbols within it.
 $(SHLIB): $(LIBNAME) $(OBJECTS)
-	$(SHLIB_LINK) -o $@ $(OBJECTS) $(LIBNAME) -lm
+	$(SHLIB_LINK) -o $@ \
+	  $(OBJECTS) -Wl,--start-group $(LIBNAME) -Wl,--end-group -lm
 
 clean:
 	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
