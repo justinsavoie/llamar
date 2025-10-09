@@ -1,4 +1,8 @@
 # ---------- src/Makevars.win (CPU-only, use default SHLIB rule) ----------
+.DEFAULT_GOAL := all
+.PHONY: all
+all: $(SHLIB)
+
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
@@ -51,8 +55,7 @@ $(info >>> SHLIB=$(SHLIB))
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
 
-# Ensure the default SHLIB link depends on our static lib,
-# but let R's winshlib.mk provide the actual link recipe.
+# Ensure R's default SHLIB link depends on our static lib
 $(SHLIB): $(LIBNAME)
 
 clean:
