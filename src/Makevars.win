@@ -7,14 +7,9 @@ $(info >>> CXX=$(CXX))
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
-PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra
-PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra
+PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
+PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
-
-# Append our suppressor AFTER R’s defaults so “defined-but-not-used” helpers don’t fail the build
-CFLAGS    = $(ALL_CFLAGS)   -Wno-unused-function
-CXXFLAGS  = $(ALL_CXXFLAGS) -Wno-unused-function
-CPPFLAGS  = $(ALL_CPPFLAGS)
 
 # ---------------- sources we actually need (no ggml-opt.cpp) ----------------
 CORE_C = \
@@ -42,12 +37,12 @@ $(info >>> LIBOBJS=$(LIBOBJS))
 $(info >>> OBJECTS=$(OBJECTS))
 $(info >>> SHLIB=$(SHLIB))
 
-# ---------------- rules ----------------
+# ---------------- rules (use ALL_* so PKG_* flags propagate) ----------------
 %.o: %.c
-	$(CC)  $(CFLAGS)   $(CPPFLAGS) -c $< -o $@
+	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
