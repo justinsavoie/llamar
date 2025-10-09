@@ -22,7 +22,7 @@ OBJECTS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quan
           llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o \
           llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o \
           llama-sampling.o llama-vocab.o llama-adapter.o ggml-opt.o \
-          interface.o
+          cpu_shim.o interface.o
 
 # Print them so we can verify it's not empty
 $(info >>> OBJECTS=$(OBJECTS))
