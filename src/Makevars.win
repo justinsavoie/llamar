@@ -1,29 +1,25 @@
-# ---------- src/Makevars.win (CPU-only) ----------
+# ---------- src/Makevars.win (CPU-only, force-include version header) ----------
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
 
-# Preprocessor & feature macros
-PKG_CPPFLAGS = -I. -I./ggml-cpu \
-  -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\" \
+# Force-include ggml-version.h so ggml.c always sees GGML_VERSION / GGML_COMMIT
+PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
-# Keep warnings on, but we must suppress unused static helpers in ggml-impl.h
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra
 PKG_LIBS     = -lm
 
-# Use ALL_* (which includes PKG_* + R's defaults), then append our overrides LAST
+# Append our suppressor AFTER R’s defaults so “defined-but-not-used” helpers don’t fail the build
 CFLAGS    = $(ALL_CFLAGS)   -Wno-unused-function
 CXXFLAGS  = $(ALL_CXXFLAGS) -Wno-unused-function
 CPPFLAGS  = $(ALL_CPPFLAGS)
 
-# ---------------- What to build ----------------
-# C sources
+# ---------------- sources we actually need (no ggml-opt.cpp) ----------------
 CORE_C = \
   ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c
 
-# C++ sources (no ggml-opt.cpp to avoid training/PRId64 noise)
 CORE_CPP = \
   ggml-backend.cpp ggml-threading.cpp \
   gguf.cpp unicode.cpp unicode-data.cpp vec.cpp \
@@ -35,33 +31,27 @@ CORE_CPP = \
   llama-mmap.cpp llama-model.cpp llama-model-loader.cpp llama-model-saver.cpp \
   llama-quant.cpp llama-sampling.cpp llama-vocab.cpp llama-adapter.cpp
 
-# Your package-facing code
+# your package-facing files
 PKG_CPP = interface.cpp cpu_shim.cpp
 
-# Turn them into .o
 LIBOBJS = $(CORE_C:.c=.o) $(CORE_CPP:.cpp=.o)
 OBJECTS = $(PKG_CPP:.cpp=.o)
-
 LIBNAME = libllama.a
 
 $(info >>> LIBOBJS=$(LIBOBJS))
 $(info >>> OBJECTS=$(OBJECTS))
 $(info >>> SHLIB=$(SHLIB))
 
-# ---------------- Rules ----------------
-# C compile
+# ---------------- rules ----------------
 %.o: %.c
 	$(CC)  $(CFLAGS)   $(CPPFLAGS) -c $< -o $@
 
-# C++ compile
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
-# Static lib for the core
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
 
-# Default target: link the DLL explicitly against our static lib
 all: $(SHLIB)
 
 $(SHLIB): $(LIBNAME) $(OBJECTS)
