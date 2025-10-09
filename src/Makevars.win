@@ -1,4 +1,4 @@
-# ---------- src/Makevars.win (CPU-only, use default SHLIB rule) ----------
+# ---------- src/Makevars.win (CPU-only; ggml-backend.cpp) ----------
 .DEFAULT_GOAL := all
 .PHONY: all
 all: $(SHLIB)
@@ -7,22 +7,17 @@ $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
 
-# Always expose version macros to ggml.c
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
   -DGGML_USE_CPU -DGGML_USE_CPU_BACKEND -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
-
-# Sensible warnings; hush some noisy helpers
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
+PKG_LIBS     = $(LIBNAME) -lm
 
-# Link the static lib we build below; let R's default rule produce the DLL
-PKG_LIBS = $(LIBNAME) -lm
-
-# ---------------- sources for the static lib ----------------
-# Include ggml-backend.c (defines ggml_backend_cpu_init)
+# ---- Core sources ----
 CORE_C = \
-  ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c ggml-backend.c
+  ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c
 
+# IMPORTANT: only the C++ backend exists here
 CORE_CPP = \
   ggml-backend.cpp ggml-threading.cpp ggml-opt.cpp \
   gguf.cpp unicode.cpp unicode-data.cpp vec.cpp \
@@ -34,10 +29,8 @@ CORE_CPP = \
   llama-mmap.cpp llama-model.cpp llama-model-loader.cpp llama-model-saver.cpp \
   llama-quant.cpp llama-sampling.cpp llama-vocab.cpp llama-adapter.cpp
 
-# Package-facing objects
 OBJECTS = interface.o cpu_shim.o
 
-# Static lib with all core objects
 LIBOBJS = $(CORE_C:.c=.o) $(CORE_CPP:.cpp=.o)
 LIBNAME = libllama.a
 
@@ -45,18 +38,15 @@ $(info >>> LIBOBJS=$(LIBOBJS))
 $(info >>> OBJECTS=$(OBJECTS))
 $(info >>> SHLIB=$(SHLIB))
 
-# ---------------- rules ----------------
 %.o: %.c
 	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
-# Build the static library
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
 
-# Ensure R's default SHLIB link depends on our static lib
 $(SHLIB): $(LIBNAME)
 
 clean:
