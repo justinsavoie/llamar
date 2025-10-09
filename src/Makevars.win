@@ -18,26 +18,10 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 # Link the static lib we build below; let R's default rule produce the DLL
 PKG_LIBS = $(LIBNAME) -lm
 
-# ---------------- locate cpu-backend source (defines ggml_backend_cpu_init) ----------------
-BACKEND_CANDIDATES := \
-  ggml-cpu/ggml-cpu-backend.c \
-  ggml-cpu-backend.c \
-  ggml-cpu/ggml_backend_cpu.c \
-  ggml_backend_cpu.c
-
-CPU_BACKEND_SRC := $(firstword $(wildcard $(BACKEND_CANDIDATES)))
-
-ifeq ($(CPU_BACKEND_SRC),)
-$(error Could not find the ggml CPU backend source that defines ggml_backend_cpu_init. \
-Tried: $(BACKEND_CANDIDATES). Add the correct file or update BACKEND_CANDIDATES.)
-endif
-
-$(info >>> CPU_BACKEND_SRC=$(CPU_BACKEND_SRC))
-
 # ---------------- sources for the static lib ----------------
+# NOTE: include ggml-backend.c (defines ggml_backend_cpu_init)
 CORE_C = \
-  ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c \
-  $(CPU_BACKEND_SRC)
+  ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c ggml-backend.c
 
 CORE_CPP = \
   ggml-backend.cpp ggml-threading.cpp ggml-opt.cpp \
