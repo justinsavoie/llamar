@@ -1,25 +1,38 @@
 # ---------- src/Makevars.win (CPU-only, llama.cpp minimal) ----------
 
-.SUFFIXES:
-.SUFFIXES: .c .cpp .o
+# Tell us what make sees:
+$(info >>> Using Makevars.win)
+$(info >>> R_HOME = $(R_HOME))
+$(info >>> CC = $(CC))
+$(info >>> CXX = $(CXX))
 
-# Make sure ggml-version.h is force-included so GGML_VERSION / GGML_COMMIT exist
+# Force-include version header so GGML_VERSION / GGML_COMMIT exist
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
-PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
+PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
 
-# IMPORTANT: keep this on ONE line so OBJECTS is definitely non-empty
+# IMPORTANT: keep this as a SINGLE LINE (no trailing spaces)
 OBJECTS = ggml.o ggml-cpu.o ggml-backend.o ggml-alloc.o cpu_shim.o interface.o llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o llama-grammar.o llama-graph.o llama-hparams.o llama-impl.o llama-io.o llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o llama-sampling.o llama-vocab.o gguf.o unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o
 
-# Compile rules (R’s default winshlib.mk will link $(OBJECTS) into the DLL)
+# Print the list so we know it isn’t empty:
+$(info >>> OBJECTS=$(OBJECTS))
+$(info >>> SHLIB=$(SHLIB))
+
+# Pattern rules to compile .c/.cpp into .o
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+
+# Explicit targets (don’t rely on implicit Windows rules)
+all: $(SHLIB)
+
+$(SHLIB): $(OBJECTS)
+	$(SHLIB_LINK) -o $@ $(OBJECTS) $(PKG_LIBS)
 
 clean:
 	-del *.o *.dll 2>nul || rm -f *.o *.dll
