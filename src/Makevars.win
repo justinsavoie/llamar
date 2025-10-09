@@ -18,9 +18,14 @@ PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 # Link the static lib we build below; let R's default rule produce the DLL
 PKG_LIBS = $(LIBNAME) -lm
 
-# ---------------- sources for the static lib (include ggml-opt.cpp) ----------------
+# ---------------- locate cpu-backend source ----------------
+# Works whether the file is in ./ggml-cpu/ or repo root
+CPU_BACKEND_SRC := $(firstword $(wildcard ggml-cpu/ggml-cpu-backend.c ggml-cpu-backend.c))
+
+# ---------------- sources for the static lib ----------------
 CORE_C = \
-  ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c
+  ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c \
+  $(CPU_BACKEND_SRC)
 
 CORE_CPP = \
   ggml-backend.cpp ggml-threading.cpp ggml-opt.cpp \
