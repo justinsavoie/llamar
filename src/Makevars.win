@@ -1,74 +1,69 @@
 # ---------- src/Makevars.win (CPU-only) ----------
-# Debug (shows up in CI logs)
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
 
-# ---------------- Flags ----------------
+# Preprocessor & feature macros
 PKG_CPPFLAGS = -I. -I./ggml-cpu \
   -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\" \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
-PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
-PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
+# Keep warnings on, but we must suppress unused static helpers in ggml-impl.h
+PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra
+PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra
 PKG_LIBS     = -lm
 
-# Use ALL_* so R injects PKG_* + system flags
-CFLAGS      = $(ALL_CFLAGS)
-CXXFLAGS    = $(ALL_CXXFLAGS)
-CPPFLAGS    = $(ALL_CPPFLAGS)
+# Use ALL_* (which includes PKG_* + R's defaults), then append our overrides LAST
+CFLAGS    = $(ALL_CFLAGS)   -Wno-unused-function
+CXXFLAGS  = $(ALL_CXXFLAGS) -Wno-unused-function
+CPPFLAGS  = $(ALL_CPPFLAGS)
 
 # ---------------- What to build ----------------
-# Core ggml (C)
+# C sources
 CORE_C = \
   ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c
 
-# ggml/llama (C++)
+# C++ sources (no ggml-opt.cpp to avoid training/PRId64 noise)
 CORE_CPP = \
   ggml-backend.cpp ggml-threading.cpp \
   gguf.cpp unicode.cpp unicode-data.cpp vec.cpp \
   binary-ops.cpp unary-ops.cpp ops.cpp traits.cpp hbm.cpp repack.cpp \
   llama.cpp llama-arch.cpp llama-batch.cpp llama-chat.cpp llama-context.cpp llama-cparams.cpp \
   llama-grammar.cpp llama-graph.cpp llama-hparams.cpp llama-impl.cpp llama-io.cpp \
-  llama-kv-cache.cpp llama-kv-cache-iswa.cpp llama-memory.cpp llama-memory-hybrid.cpp llama-memory-recurrent.cpp \
-  llama-mmap.cpp llama-model.cpp llama-model-loader.cpp llama-model-saver.cpp llama-quant.cpp \
-  llama-sampling.cpp llama-vocab.cpp llama-adapter.cpp \
-  ggml-opt.cpp
+  llama-kv-cache.cpp llama-kv-cache-iswa.cpp llama-memory.cpp \
+  llama-memory-hybrid.cpp llama-memory-recurrent.cpp \
+  llama-mmap.cpp llama-model.cpp llama-model-loader.cpp llama-model-saver.cpp \
+  llama-quant.cpp llama-sampling.cpp llama-vocab.cpp llama-adapter.cpp
 
-# If you *don’t* use the training/optimizer APIs, comment this out to silence warnings:
-# CORE_CPP := $(filter-out ggml-opt.cpp,$(CORE_CPP))
-
-# Your package-facing objects (small shim + your interface)
+# Your package-facing code
 PKG_CPP = interface.cpp cpu_shim.cpp
 
-# Turn them into .o names
-LIBOBJS   = $(CORE_C:.c=.o) $(CORE_CPP:.cpp=.o)
-OBJECTS   = $(PKG_CPP:.cpp=.o)
+# Turn them into .o
+LIBOBJS = $(CORE_C:.c=.o) $(CORE_CPP:.cpp=.o)
+OBJECTS = $(PKG_CPP:.cpp=.o)
 
-# Static lib name for the ggml/llama core
-LIBNAME   = libllama.a
+LIBNAME = libllama.a
 
 $(info >>> LIBOBJS=$(LIBOBJS))
 $(info >>> OBJECTS=$(OBJECTS))
 $(info >>> SHLIB=$(SHLIB))
 
 # ---------------- Rules ----------------
-# Compile C
+# C compile
 %.o: %.c
 	$(CC)  $(CFLAGS)   $(CPPFLAGS) -c $< -o $@
 
-# Compile C++
+# C++ compile
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
-# Build static library from core
+# Static lib for the core
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
 
-# Default target: build DLL; ensure lib built first
+# Default target: link the DLL explicitly against our static lib
 all: $(SHLIB)
 
-# Explicit link: R’s winshlib.mk normally links $(OBJECTS), but we also want our lib
 $(SHLIB): $(LIBNAME) $(OBJECTS)
 	$(SHLIB_LINK) -o $@ $(OBJECTS) $(LIBNAME) $(PKG_LIBS)
 
