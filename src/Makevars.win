@@ -1,4 +1,4 @@
-# ---------- src/Makevars.win (CPU-only, llama.cpp minimal) ----------
+# ---------- src/Makevars.win (CPU-only: build a static lib, then link) ----------
 
 # CI debug
 $(info >>> Using Makevars.win)
@@ -13,8 +13,11 @@ PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 PKG_LIBS     = -lm
 
-# Build EVERYTHING we actually reference (single line; no trailing spaces)
-OBJECTS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quants.o \
+# ---- Build the static library with EVERYTHING we need ----
+LIBNAME  = libllama.a
+
+# (single line; no trailing spaces)
+LIBOBJS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quants.o \
           ggml-cpu.o ggml-cpu-xx.o \
           gguf.o unicode.o unicode-data.o vec.o binary-ops.o unary-ops.o ops.o traits.o hbm.o repack.o \
           llama.o llama-arch.o llama-batch.o llama-chat.o llama-context.o llama-cparams.o \
@@ -22,13 +25,16 @@ OBJECTS = ggml.o ggml-alloc.o ggml-backend.o ggml-threading.o ggml-quants.o quan
           llama-kv-cache.o llama-kv-cache-iswa.o llama-memory.o llama-memory-hybrid.o llama-memory-recurrent.o \
           llama-mmap.o llama-model.o llama-model-loader.o llama-model-saver.o llama-quant.o \
           llama-sampling.o llama-vocab.o llama-adapter.o \
-          ggml-opt.o \
-          cpu_shim.o interface.o
+          ggml-opt.o
 
+# ---- The DLL will only compile/link these small glue objs and the static lib ----
+OBJECTS = cpu_shim.o interface.o
+
+$(info >>> LIBOBJS=$(LIBOBJS))
 $(info >>> OBJECTS=$(OBJECTS))
 $(info >>> SHLIB=$(SHLIB))
 
-# Compile rules – use ALL_* so PKG_* propagate
+# Compile rules – use ALL_* so PKG_* flags propagate
 %.o: %.c
 	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
@@ -39,11 +45,15 @@ $(info >>> SHLIB=$(SHLIB))
 ggml-cpu-xx.o: ggml-cpu.cpp
 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
-# Explicit link rule (forces DLL creation)
+# Build the static library first
+$(LIBNAME): $(LIBOBJS)
+	ar rcs $@ $(LIBOBJS)
+
+# Explicit link rule for the package DLL
 all: $(SHLIB)
 
-$(SHLIB): $(OBJECTS)
-	$(SHLIB_LINK) -o $@ $(OBJECTS) $(PKG_LIBS)
+$(SHLIB): $(OBJECTS) $(LIBNAME)
+	$(SHLIB_LINK) -o $@ $(OBJECTS) $(LIBNAME) $(PKG_LIBS)
 
 clean:
-	-del *.o *.dll 2>nul || rm -f *.o *.dll
+	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
