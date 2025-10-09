@@ -1,4 +1,4 @@
-# ---------- src/Makevars.win (CPU-only, build static lib + let R link) ----------
+# ---------- src/Makevars.win (CPU-only: build lib + explicitly link DLL) ----------
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
@@ -7,13 +7,14 @@ $(info >>> CXX=$(CXX))
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
   -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
 
+# Keep warnings sensible; suppress helper noise
 PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
 PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
 
-# IMPORTANT: link the static lib via PKG_LIBS (no custom $(SHLIB) recipe!)
-PKG_LIBS = $(LIBNAME) -lm
+# We'll pass -lm in the final link recipe
+PKG_LIBS     =
 
-# ---- sources to go into the static library (no ggml-opt.cpp) ----
+# -------- sources that go into the static lib (no ggml-opt.cpp) --------
 CORE_C = \
   ggml.c ggml-alloc.c ggml-quants.c quants.c ggml-cpu.c
 
@@ -31,30 +32,32 @@ CORE_CPP = \
 LIBOBJS = $(CORE_C:.c=.o) $(CORE_CPP:.cpp=.o)
 LIBNAME = libllama.a
 
-# ---- package-facing objects that R should link into the DLL ----
+# -------- package-facing objects that expose the R API --------
 OBJECTS = interface.o cpu_shim.o
 
 $(info >>> LIBOBJS=$(LIBOBJS))
 $(info >>> OBJECTS=$(OBJECTS))
 $(info >>> SHLIB=$(SHLIB))
 
-# ---- compile rules (use ALL_* so PKG_* flags propagate) ----
+# -------- compile rules (use ALL_* so PKG_* propagate) --------
 %.o: %.c
 	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 
-# Build the static library with all ggml/llama objects
+# Build the static library
 $(LIBNAME): $(LIBOBJS)
 	$(AR) rcs $@ $(LIBOBJS)
 
-# Tell R's default linker rule that the DLL also depends on our static lib
-# (This adds a prerequisite only; we DO NOT override the $(SHLIB) recipe.)
-$(SHLIB): $(LIBNAME)
-
-# Default target
+# Default target: build DLL (let this depend on lib + our pkg objects)
 all: $(SHLIB)
+
+# -------- explicit link step (forces DLL creation) --------
+# We intentionally provide a recipe here so linking always happens.
+# This will emit a harmless "overriding recipe" warning from winshlib.mk, which is fine.
+$(SHLIB): $(LIBNAME) $(OBJECTS)
+	$(SHLIB_LINK) -o $@ $(OBJECTS) $(LIBNAME) -lm
 
 clean:
 	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
