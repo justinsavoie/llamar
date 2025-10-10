@@ -1,51 +1,89 @@
-# ---------- src/Makevars.win (CPU-only; ggml-backend.cpp) ----------
+# ---------- src/Makevars.win (Modern llama.cpp CPU-only build) ----------
 .DEFAULT_GOAL := all
-.PHONY: all
-all: $(SHLIB)
+.PHONY: all clean
 
 $(info >>> Using Makevars.win)
 $(info >>> CC=$(CC))
 $(info >>> CXX=$(CXX))
 
+# ------------------------------------------------------------
+# Compiler / linker configuration
+# ------------------------------------------------------------
+CXX_STD = CXX17
+SHLIB_LD = $(CXX)
+
 PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
-  -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS
-PKG_CFLAGS   = -O3 -DNDEBUG -Wall -Wextra -Wno-unused-function
-PKG_CXXFLAGS = -O3 -DNDEBUG -std=gnu++17 -Wall -Wextra -Wno-unused-function
-PKG_LIBS     = $(LIBNAME) -lm
+  -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS \
+  -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\"
 
-# ---- Core sources ----
-CORE_C = \
-  ggml.c ggml-alloc.c ggml-quants.c quants.c
+PKG_CFLAGS   = -O3 -DNDEBUG -pthread -Wall -Wextra -Wno-unused-function
+PKG_CXXFLAGS = -O3 -DNDEBUG -pthread -std=gnu++17 -Wall -Wextra -Wno-unused-function
+PKG_LIBS     = -lm -pthread
+# macOS alternative (optional): uncomment next line
+# PKG_LIBS += -framework Accelerate
 
-CORE_CPP = \
-  ggml-cpu.cpp ggml-backend.cpp ggml-threading.cpp ggml-opt.cpp \
-  gguf.cpp unicode.cpp unicode-data.cpp vec.cpp \
-  binary-ops.cpp unary-ops.cpp ops.cpp traits.cpp hbm.cpp repack.cpp \
-  llama.cpp llama-arch.cpp llama-batch.cpp llama-chat.cpp llama-context.cpp llama-cparams.cpp \
-  llama-grammar.cpp llama-graph.cpp llama-hparams.cpp llama-impl.cpp llama-io.cpp \
-  llama-kv-cache.cpp llama-kv-cache-iswa.cpp llama-memory.cpp \
-  llama-memory-hybrid.cpp llama-memory-recurrent.cpp \
-  llama-mmap.cpp llama-model.cpp llama-model-loader.cpp llama-model-saver.cpp \
-  llama-quant.cpp llama-sampling.cpp llama-vocab.cpp llama-adapter.cpp
+# ------------------------------------------------------------
+# Core sources (modern llama.cpp layout — all C++)
+# ------------------------------------------------------------
+OBJECTS = \
+    binary-ops.o \
+    ggml-alloc.o \
+    ggml-backend.o \
+    ggml-cpu.o \
+    ggml-opt.o \
+    ggml-quants.o \
+    ggml-threading.o \
+    ggml.o \
+    gguf.o \
+    hbm.o \
+    llama-adapter.o \
+    llama-arch.o \
+    llama-batch.o \
+    llama-chat.o \
+    llama-context.o \
+    llama-cparams.o \
+    llama-grammar.o \
+    llama-graph.o \
+    llama-hparams.o \
+    llama-impl.o \
+    llama-io.o \
+    llama-kv-cache-iswa.o \
+    llama-kv-cache.o \
+    llama-memory-hybrid.o \
+    llama-memory-recurrent.o \
+    llama-memory.o \
+    llama-mmap.o \
+    llama-model-loader.o \
+    llama-model-saver.o \
+    llama-model.o \
+    llama-quant.o \
+    llama-sampling.o \
+    llama-vocab.o \
+    llama.o \
+    cpu_shim.o \
+    ops.o \
+    repack.o \
+    traits.o \
+    unary-ops.o \
+    unicode-data.o \
+    unicode.o \
+    vec.o \
+    interface.o \
+    quants.o
 
-OBJECTS = interface.o cpu_shim.o
-LIBOBJS = $(CORE_C:.c=.o) $(CORE_CPP:.cpp=.o)
-LIBNAME = libllama.a
-
-$(info >>> LIBOBJS=$(LIBOBJS))
-$(info >>> OBJECTS=$(OBJECTS))
-$(info >>> SHLIB=$(SHLIB))
-
+# ------------------------------------------------------------
+# Compilation rules
+# ------------------------------------------------------------
 %.o: %.c
-	$(CC)  $(ALL_CFLAGS)   $(ALL_CPPFLAGS) -c $< -o $@
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $< -o $@
 
 %.o: %.cpp
-	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
+	$(CXX) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) -c $< -o $@
 
-$(LIBNAME): $(LIBOBJS)
-	$(AR) rcs $@ $(LIBOBJS)
-
-$(SHLIB): $(LIBNAME)
+# ------------------------------------------------------------
+# Build target
+# ------------------------------------------------------------
+all: $(SHLIB)
 
 clean:
 	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
