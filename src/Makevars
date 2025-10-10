@@ -1,34 +1,34 @@
-## Build llama.cpp and ggml in-tree (CPU-only)
-## This avoids ABI mismatches from external prebuilt libraries.
+# ---------- src/Makevars.win (Modern llama.cpp CPU-only build) ----------
+.DEFAULT_GOAL := all
+.PHONY: all clean
 
-## Ensure the default make target builds the shared library
-all: $(SHLIB)
+$(info >>> Using Makevars.win)
+$(info >>> CC=$(CC))
+$(info >>> CXX=$(CXX))
 
-## C++ standard required by llama.cpp
+# ------------------------------------------------------------
+# Compiler / linker configuration
+# ------------------------------------------------------------
 CXX_STD = CXX17
-
-## Force C++ linker for the shared library (we compile C++ sources)
 SHLIB_LD = $(CXX)
 
-## Optimization flags (safe defaults across platforms)
-PKG_CFLAGS   += -O3 -DNDEBUG -pthread
-PKG_CXXFLAGS += -O3 -DNDEBUG -pthread
+PKG_CPPFLAGS = -I. -I./ggml-cpu -include ggml-version.h \
+  -DGGML_USE_CPU -DGGML_CPU_GENERIC -DGGML_USE_K_QUANTS \
+  -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\"
 
-## Avoid forcing x86-specific flags by default to preserve portability
+PKG_CFLAGS   = -O3 -DNDEBUG -pthread -Wall -Wextra -Wno-unused-function
+PKG_CXXFLAGS = -O3 -DNDEBUG -pthread -std=gnu++17 -Wall -Wextra -Wno-unused-function
+PKG_LIBS     = -lm -pthread
+# macOS alternative (optional): uncomment next line
+# PKG_LIBS += -framework Accelerate
 
-## Ensure local headers are found from subdirectories
-PKG_CPPFLAGS += -I. -I./ggml-cpu
-PKG_CPPFLAGS += -DGGML_VERSION=\"local\" -DGGML_COMMIT=\"local\"
-## Enable K-quants and use generic CPU kernels to provide needed symbols
-PKG_CPPFLAGS += -DGGML_USE_K_QUANTS -DGGML_CPU_GENERIC
-PKG_CPPFLAGS += -DGGML_USE_CPU
-
-## Explicit object list to avoid basename collisions (exclude ggml.cpp).
+# ------------------------------------------------------------
+# Core sources (modern llama.cpp layout — all C++)
+# ------------------------------------------------------------
 OBJECTS = \
     binary-ops.o \
     ggml-alloc.o \
     ggml-backend.o \
-    ggml-cpu-cxx.o \
     ggml-cpu.o \
     ggml-opt.o \
     ggml-quants.o \
@@ -69,17 +69,21 @@ OBJECTS = \
     unicode.o \
     vec.o \
     interface.o \
-    quants.o \
-    init.o
+    quants.o
 
-## No external libs: link only the objects above
-## On macOS you may optionally add Accelerate for BLAS: uncomment next line
-PKG_LIBS += -pthread
-# PKG_LIBS += -framework Accelerate
+# ------------------------------------------------------------
+# Compilation rules
+# ------------------------------------------------------------
+%.o: %.c
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $< -o $@
 
-## Rcpp headers are resolved via LinkingTo; no hardcoded include path needed
-
-# Explicit rule: build C++ CPU backend object from ggml-cpu.cpp to avoid name collision with ggml-cpu.c
-ggml-cpu-cxx.o: ggml-cpu.cpp
+%.o: %.cpp
 	$(CXX) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) -c $< -o $@
-PKG_LIBS += -Wl,-undefined,error
+
+# ------------------------------------------------------------
+# Build target
+# ------------------------------------------------------------
+all: $(SHLIB)
+
+clean:
+	-del *.o *.a *.dll 2>nul || rm -f *.o *.a *.dll
